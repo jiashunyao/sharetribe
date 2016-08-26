@@ -68,6 +68,8 @@ Then("I expect transaction with PayPal test to pass") do
   navigation = FeatureTests::Navigation
   data = FeatureTests::Data
   home = FeatureTests::Page::Home
+  listing = FeatureTests::Page::Listing
+  listing_book = FeatureTests::Page::ListingBook
 
   marketplace = data.create_marketplace(payment_gateway: :paypal)
   admin = data.create_member(username: "paypal_admin", marketplace_id: marketplace[:id], admin: true)
@@ -93,3 +95,17 @@ Then("I expect transaction with PayPal test to pass") do
   login_as(member[:username], member[:password])
 
   home.click_listing("Lörem ipsum")
+  listing.fill_in_booking_dates
+  listing.click_request
+
+  expect(page).to have_content("Request Lörem ipsum")
+  listing_book.fill_in_message("Trölölö")
+  listing_book.proceed_to_payment
+
+  # TODO: proceed etc
+  # TODO: admin accepts request
+
+  # TODO: remove
+  sleep 5
+  save_screenshot("tmp/screenshots/dev-finish.png")
+end

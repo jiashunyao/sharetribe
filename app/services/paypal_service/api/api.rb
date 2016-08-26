@@ -5,6 +5,8 @@ module PaypalService::API
     if Rails.env.test?
       FakeApiImplementation
     else
-      ApiImplementation
+      # ApiImplementation
+      require_relative '../../../../spec/services/paypal_service/api/fake_api_implementation'
+      FakeApiImplementation
     end
 end
