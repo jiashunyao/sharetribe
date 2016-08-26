@@ -42,6 +42,10 @@ module FeatureTests
         header.click_link("Post a new listing")
       end
 
+      def click_inbox
+        header.find("#inbox-link").click
+      end
+
       def header
         find(".header")
       end

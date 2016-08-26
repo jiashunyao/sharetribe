@@ -15,6 +15,11 @@ def logout_foo
   expect(page).to have_content("You have now been logged out of Test marketplace. See you soon!")
 end
 
+def logout_and_login_as(username, password)
+  logout_foo
+  login_as(username, password)
+end
+
 def connect_marketplace_paypal
   topbar = FeatureTests::Section::Topbar
   paypal_preferences = FeatureTests::Section::MarketplacePaypalPreferences
@@ -64,12 +69,18 @@ def add_listing(title, price: "2.0")
   expect(page).to have_content(title)
 end
 
+def dismiss_onboarding_wizard_dialog
+  expect(page).to have_content("Woohoo, task completed!")
+  page.click_on("I'll do it later, thanks")
+end
+
 Then("I expect transaction with PayPal test to pass") do
   navigation = FeatureTests::Navigation
   data = FeatureTests::Data
   home = FeatureTests::Page::Home
   listing = FeatureTests::Page::Listing
   listing_book = FeatureTests::Page::ListingBook
+  topbar = FeatureTests::Section::Topbar
 
   marketplace = data.create_marketplace(payment_gateway: :paypal)
   admin = data.create_member(username: "paypal_admin", marketplace_id: marketplace[:id], admin: true)
@@ -80,19 +91,15 @@ Then("I expect transaction with PayPal test to pass") do
   login_as(admin[:username], admin[:password])
   connect_marketplace_paypal
 
-  # Dismiss Onboarding Wizard dialog
-  expect(page).to have_content("Woohoo, task completed!")
-  page.click_on("I'll do it later, thanks")
+  dismiss_onboarding_wizard_dialog
 
   connect_seller_paypal
   add_listing("Lörem ipsum")
 
-  # Dismiss Onboarding Wizard dialog
-  expect(page).to have_content("Woohoo, task completed!")
-  page.click_on("I'll do it later, thanks")
+  dismiss_onboarding_wizard_dialog
 
-  logout_foo
-  login_as(member[:username], member[:password])
+  # Member buys the listing
+  logout_and_login_as(member[:username], member[:password])
 
   home.click_listing("Lörem ipsum")
   listing.fill_in_booking_dates
@@ -102,10 +109,44 @@ Then("I expect transaction with PayPal test to pass") do
   listing_book.fill_in_message("Trölölö")
   listing_book.proceed_to_payment
 
-  # TODO: proceed etc
-  # TODO: admin accepts request
+  expect(page).to have_content("Conversation with")
+  expect(page).to have_content("Payment authorized")
+  expect(page).to have_content("Lörem ipsum")
+  expect(page).to have_content("Trölölö")
 
-  # TODO: remove
-  sleep 5
-  save_screenshot("tmp/screenshots/dev-finish.png")
+  # Adming accepts request
+  logout_and_login_as(admin[:username], admin[:password])
+  topbar.click_inbox
+
+  expect(page).to have_content("Waiting for you to accept the request")
+  page.click_link("Payment authorized")
+  expect(page).to have_content("Conversation with")
+  page.click_link("Accept request")
+  expect(page).to have_content("Order details")
+  page.click_button("Accept")
+  expect(page).to have_content("Request accepted")
+  expect(page).to have_content("Payment successful")
+
+  # Member marks the payment completed
+  logout_and_login_as(member[:username], member[:password])
+  topbar.click_inbox
+
+  expect(page).to have_content("Waiting for you to mark the order completed")
+  page.click_link("accepted the request, received payment for")
+  page.click_link("Mark completed")
+
+  expect(page).to have_content("If your order has been fulfilled you should confirm it as done.")
+  choose("Skip feedback")
+  page.click_button("Continue")
+  expect(page).to have_content("Offer confirmed")
+  expect(page).to have_content("Feedback skipped")
+
+  # Admin skips feedback
+  logout_and_login_as(admin[:username], admin[:password])
+  topbar.click_inbox
+
+  expect(page).to have_content("Waiting for you to give feedback")
+  page.click_link("marked the order as completed")
+  page.click_link("Skip feedback")
+  expect(page).to have_content("Feedback skipped")
 end
