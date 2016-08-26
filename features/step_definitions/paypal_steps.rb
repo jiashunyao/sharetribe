@@ -74,6 +74,70 @@ def dismiss_onboarding_wizard_dialog
   page.click_on("I'll do it later, thanks")
 end
 
+def request_listing(listing_title)
+  home = FeatureTests::Page::Home
+  listing = FeatureTests::Page::Listing
+  listing_book = FeatureTests::Page::ListingBook
+
+  home.click_listing(listing_title)
+  listing.fill_in_booking_dates
+  listing.click_request
+
+  expect(page).to have_content("Request #{listing_title}")
+  listing_book.fill_in_message("Trölölö #{listing_title}")
+  listing_book.proceed_to_payment
+
+  expect(page).to have_content("Payment authorized")
+  expect(page).to have_content("Trölölö #{listing_title}")
+end
+
+def accept_listing_request
+  topbar = FeatureTests::Section::Topbar
+
+  topbar.click_inbox
+
+  # Inbox
+  expect(page).to have_content("Waiting for you to accept the request")
+  page.click_link("Payment authorized")
+
+  # Transaction conversation page
+  page.click_link("Accept request")
+
+  # Order details page
+  page.click_button("Accept")
+  expect(page).to have_content("Request accepted")
+  expect(page).to have_content("Payment successful")
+end
+
+def buyer_mark_completed
+  topbar = FeatureTests::Section::Topbar
+
+  topbar.click_inbox
+
+  # Transaction conversation page
+  expect(page).to have_content("Waiting for you to mark the order completed")
+  page.click_link("accepted the request, received payment for")
+  page.click_link("Mark completed")
+
+  choose("Skip feedback")
+  page.click_button("Continue")
+
+  expect(page).to have_content("Offer confirmed")
+  expect(page).to have_content("Feedback skipped")
+end
+
+def seller_mark_completed
+  topbar = FeatureTests::Section::Topbar
+
+  topbar.click_inbox
+
+  # Transaction conversation page
+  expect(page).to have_content("Waiting for you to give feedback")
+  page.click_link("marked the order as completed")
+  page.click_link("Skip feedback")
+  expect(page).to have_content("Feedback skipped")
+end
+
 Then("I expect transaction with PayPal test to pass") do
   navigation = FeatureTests::Navigation
   data = FeatureTests::Data
@@ -88,65 +152,31 @@ Then("I expect transaction with PayPal test to pass") do
 
   navigation.navigate_in_marketplace!(ident: marketplace[:ident])
 
+  # Connect Paypal for marketplace and seller
   login_as(admin[:username], admin[:password])
   connect_marketplace_paypal
-
   dismiss_onboarding_wizard_dialog
-
   connect_seller_paypal
-  add_listing("Lörem ipsum")
 
+  # Add new listing
+  add_listing("Lörem ipsum")
   dismiss_onboarding_wizard_dialog
 
   # Member buys the listing
   logout_and_login_as(member[:username], member[:password])
-
-  home.click_listing("Lörem ipsum")
-  listing.fill_in_booking_dates
-  listing.click_request
-
-  expect(page).to have_content("Request Lörem ipsum")
-  listing_book.fill_in_message("Trölölö")
-  listing_book.proceed_to_payment
-
-  expect(page).to have_content("Conversation with")
-  expect(page).to have_content("Payment authorized")
-  expect(page).to have_content("Lörem ipsum")
-  expect(page).to have_content("Trölölö")
+  request_listing("Lörem ipsum")
 
   # Adming accepts request
   logout_and_login_as(admin[:username], admin[:password])
-  topbar.click_inbox
-
-  expect(page).to have_content("Waiting for you to accept the request")
-  page.click_link("Payment authorized")
-  expect(page).to have_content("Conversation with")
-  page.click_link("Accept request")
-  expect(page).to have_content("Order details")
-  page.click_button("Accept")
-  expect(page).to have_content("Request accepted")
-  expect(page).to have_content("Payment successful")
+  accept_listing_request
 
   # Member marks the payment completed
   logout_and_login_as(member[:username], member[:password])
-  topbar.click_inbox
-
-  expect(page).to have_content("Waiting for you to mark the order completed")
-  page.click_link("accepted the request, received payment for")
-  page.click_link("Mark completed")
-
-  expect(page).to have_content("If your order has been fulfilled you should confirm it as done.")
-  choose("Skip feedback")
-  page.click_button("Continue")
-  expect(page).to have_content("Offer confirmed")
-  expect(page).to have_content("Feedback skipped")
+  buyer_mark_completed
 
   # Admin skips feedback
   logout_and_login_as(admin[:username], admin[:password])
-  topbar.click_inbox
+  seller_mark_completed
 
-  expect(page).to have_content("Waiting for you to give feedback")
-  page.click_link("marked the order as completed")
-  page.click_link("Skip feedback")
-  expect(page).to have_content("Feedback skipped")
+  expect(page).to have_content("Completed")
 end
